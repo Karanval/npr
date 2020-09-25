@@ -1,0 +1,193 @@
+{
+	"artifacts" : 
+	[
+		{
+			"path" : "exercises/exercise_2/exercise_2_1/exercise_2_1.exe"
+		},
+		{
+			"path" : "exercises/exercise_2/exercise_2_1/exercise_2_1.pdb"
+		}
+	],
+	"backtrace" : 1,
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"add_executable",
+			"target_link_libraries",
+			"include_directories",
+			"target_include_directories"
+		],
+		"files" : 
+		[
+			"exercises/exercise_2/exercise_2_1/CMakeLists.txt",
+			"CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 3,
+				"parent" : 0
+			},
+			{
+				"command" : 1,
+				"file" : 0,
+				"line" : 5,
+				"parent" : 0
+			},
+			{
+				"file" : 1
+			},
+			{
+				"command" : 2,
+				"file" : 1,
+				"line" : 40,
+				"parent" : 3
+			},
+			{
+				"command" : 3,
+				"file" : 0,
+				"line" : 7,
+				"parent" : 0
+			}
+		]
+	},
+	"compileGroups" : 
+	[
+		{
+			"compileCommandFragments" : 
+			[
+				{
+					"fragment" : "/DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1   -std:c++14"
+				}
+			],
+			"includes" : 
+			[
+				{
+					"backtrace" : 4,
+					"path" : "C:/projects/graphics-programming-exercises/include"
+				},
+				{
+					"backtrace" : 4,
+					"path" : "C:/projects/graphics-programming-exercises/common/third-party/glad/include"
+				},
+				{
+					"backtrace" : 4,
+					"path" : "C:/projects/graphics-programming-exercises/common/third-party/glfw/include"
+				},
+				{
+					"backtrace" : 4,
+					"path" : "C:/projects/graphics-programming-exercises/common/third-party/imgui/include"
+				},
+				{
+					"backtrace" : 4,
+					"path" : "C:/projects/graphics-programming-exercises/common/third-party/glm"
+				},
+				{
+					"backtrace" : 4,
+					"path" : "C:/projects/graphics-programming-exercises/common/third-party/STBImage"
+				},
+				{
+					"backtrace" : 4,
+					"path" : "C:/projects/graphics-programming-exercises/common/third-party/assimp/include"
+				},
+				{
+					"backtrace" : 4,
+					"path" : "C:/projects/graphics-programming-exercises/common/third-party/assimp"
+				},
+				{
+					"backtrace" : 4,
+					"path" : "C:/projects/graphics-programming-exercises/common/third-party/zlib"
+				},
+				{
+					"backtrace" : 4,
+					"path" : "C:/projects/graphics-programming-exercises/common/third-party/../shared"
+				},
+				{
+					"backtrace" : 5,
+					"path" : "C:/projects/graphics-programming-exercises/exercises/exercise_2/exercise_2_1"
+				}
+			],
+			"language" : "CXX",
+			"sourceIndexes" : 
+			[
+				0
+			]
+		}
+	],
+	"dependencies" : 
+	[
+		{
+			"backtrace" : 2,
+			"id" : "glfw::@c776322c4f291981a324"
+		},
+		{
+			"backtrace" : 2,
+			"id" : "glad::@0e9427c8fa045f976263"
+		}
+	],
+	"id" : "exercise_2_1::@ff1107a113ffdb9df789",
+	"link" : 
+	{
+		"commandFragments" : 
+		[
+			{
+				"fragment" : "/DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1",
+				"role" : "flags"
+			},
+			{
+				"fragment" : "/machine:x64 /debug /INCREMENTAL /subsystem:console",
+				"role" : "flags"
+			},
+			{
+				"fragment" : "..\\..\\..\\common\\third-party\\glad\\glad.lib ..\\..\\..\\common\\third-party\\glfw\\src\\glfw3.lib kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib",
+				"role" : "libraries"
+			}
+		],
+		"language" : "CXX"
+	},
+	"name" : "exercise_2_1",
+	"nameOnDisk" : "exercise_2_1.exe",
+	"paths" : 
+	{
+		"build" : "exercises/exercise_2/exercise_2_1",
+		"source" : "exercises/exercise_2/exercise_2_1"
+	},
+	"sourceGroups" : 
+	[
+		{
+			"name" : "Source Files",
+			"sourceIndexes" : 
+			[
+				0
+			]
+		},
+		{
+			"name" : "Header Files",
+			"sourceIndexes" : 
+			[
+				1
+			]
+		}
+	],
+	"sources" : 
+	[
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "exercises/exercise_2/exercise_2_1/main.cpp",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"path" : "exercises/exercise_2/exercise_2_1/shader_s.h",
+			"sourceGroupIndex" : 1
+		}
+	],
+	"type" : "EXECUTABLE"
+}

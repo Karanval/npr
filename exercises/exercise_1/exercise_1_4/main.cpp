@@ -1,15 +1,18 @@
+#define _USE_MATH_DEFINES
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
 #include <iostream>
 #include <vector>
 #include <cmath>
+#include <math.h>
 
 
 // function declarations
 // ---------------------
 void createArrayBuffer(const std::vector<float> &array, unsigned int &VBO);
 void setupShape(unsigned int shaderProgram, unsigned int &VAO, unsigned int &vertexCount);
+void setupShapeE(const unsigned int shaderProgram,unsigned int &VAO, unsigned int &vertexCount);
 void draw(unsigned int shaderProgram, unsigned int VAO, unsigned int vertexCount);
 
 
@@ -29,6 +32,7 @@ const unsigned int SCR_HEIGHT = 800;
 // ---------------
 const char *vertexShaderSource = "#version 330 core\n"
                                  "layout (location = 0) in vec3 aPos;\n"
+                                 //"layout (location = 1) in vec3 aInd;\n"
                                  "layout (location = 1) in vec3 aColor;\n"
                                  "out vec3 vtxColor; // output a color to the fragment shader\n"
                                  "void main()\n"
@@ -177,24 +181,35 @@ void createArrayBuffer(const std::vector<float> &array, unsigned int &VBO){
 // create the geometry, a vertex array object representing it, and set how a shader program should read it
 // -------------------------------------------------------------------------------------------------------
 void setupShape(const unsigned int shaderProgram,unsigned int &VAO, unsigned int &vertexCount){
+    std::vector<float> vertices,  colors;
+    float angleStep = (float)360 / 16; // degres
+    angleStep = 2.0f * M_PI / (float)16; // pi radiands = 180 degress
+    angleStep = M_2_PI / (float)16; // pi radiands = 180 degress
+    int times = 0;
+    for(double angle = 0; angle <= 360;){
+        vertices.push_back(0.0f); colors.push_back(.5f);
+        vertices.push_back(0.0f); colors.push_back(.5f);
+        vertices.push_back(0.0f); colors.push_back(.5f);
+
+        vertices.push_back(.5f*cos(angle));colors.push_back(vertices.back() + .5f);
+        vertices.push_back(.5f*sin(angle));colors.push_back(vertices.back() + .5f);
+        vertices.push_back(0.0f);colors.push_back(vertices.back() + .5f);
+
+        angle+=angleStep;
+        vertices.push_back(.5f*cos(angle));colors.push_back(vertices.back() + .5f);
+        vertices.push_back(.5f*sin(angle));colors.push_back(vertices.back() + .5f);
+        vertices.push_back(0.0f);colors.push_back(vertices.back() + .5f);
+        //angle+=angleStep;
+    }
+
 
     unsigned int posVBO, colorVBO;
-    createArrayBuffer(std::vector<float>{
-            // position
-            0.0f,  0.0f, 0.0f,
-            0.5f,  0.0f, 0.0f,
-            0.5f,  0.5f, 0.0f
-    }, posVBO);
+    createArrayBuffer(vertices, posVBO);
 
-    createArrayBuffer( std::vector<float>{
-            // color
-            1.0f,  0.0f, 0.0f,
-            1.0f,  0.0f, 0.0f,
-            1.0f,  0.0f, 0.0f
-    }, colorVBO);
+    createArrayBuffer( colors, colorVBO);
 
     // tell how many vertices to draw
-    vertexCount = 3;
+    vertexCount = vertices.size()/3;
 
     // create a vertex array object (VAO) on OpenGL and save a handle to it
     glGenVertexArrays(1, &VAO);
@@ -221,6 +236,116 @@ void setupShape(const unsigned int shaderProgram,unsigned int &VAO, unsigned int
     glVertexAttribPointer(colorAttributeLocation, colorSize, GL_FLOAT, GL_FALSE, 0, 0);
 
 }
+void setupShapeE(const unsigned int shaderProgram,unsigned int &VAO, unsigned int &vertexCount){
+
+    //unsigned int posVBO, colorVBO;
+//    createArrayBuffer(std::vector<float>{
+//            // position
+//            0.0f,  0.0f, 0.0f,
+//            0.5f,  0.0f, 0.0f,
+//            0.5f,  0.5f, 0.0f
+//    }, posVBO);
+//
+//    createArrayBuffer( std::vector<float>{
+//            // color
+//            1.0f,  0.0f, 0.0f,
+//            1.0f,  0.0f, 0.0f,
+//            1.0f,  0.0f, 0.0f
+//    }, colorVBO);
+    // change 16 here to have more triangles
+//    float vertices[(16+1)*3]={},  colors[(16+1)*3]={};
+//    float angle;
+//    unsigned int indices[16*3], i, current, lindex = 0, lvalue=2; // total triangles
+//    vertices[0] = 0.0f;
+//    vertices[1] = 0.0f;
+//    vertices[2] = 0.0f;
+//    current = 3;
+//    unsigned int n = 16;
+//    angle = 360 / n;
+//
+//    for (unsigned int i = 3; i <= n; i++) {
+//        //x value
+//        vertices[current] = 0.5f * std::cos(angle); //+A.x if not in origin
+//        colors[current] = 0.6f;
+//        // y value
+//        vertices[++current] = 0.5f * std::sin(angle);//+A.y if not in origin
+//        colors[current] = 0.1f;
+//        //z value
+//        vertices[++current] = 0.0f;
+//        colors[current] = 0.3f;
+//        current ++;
+//        for (int j = 1; j< 3; j++) {
+//            indices[lindex] = 1;
+//            indices[++lindex] = lvalue;
+//            std::cout << "lindex:, lvalue:"<<lindex << lvalue << std::endl;
+//            indices[++lindex] = ++lvalue;
+//            std::cout << "lindex:, lvalue:"<<lindex << lvalue << std::endl;
+//            ++lindex;
+//        }
+//    }
+    float vertices[] = {
+            0.5f,  0.5f, 0.0f,  // top right
+            0.5f, -0.5f, 0.0f,  // bottom right
+            -0.5f, -0.5f, 0.0f,  // bottom left
+            -0.5f,  0.5f, 0.0f   // top left
+    };
+    float colors[] = {
+            0.5f,  0.5f, 0.0f,  // top right
+            0.5f,  0.5f, 0.0f,  // bottom right
+            0.5f,  0.5f, 1.0f,  // bottom left
+            0.5f,  0.5f, 0.0f   // top left
+    };
+    unsigned int indices[] = {  // note that we start from 0!
+            0, 1, 3,   // first triangle
+            1, 2, 3    // second triangle
+    };
+
+    // create a vertex array object (VAO) on OpenGL and save a handle to it
+    glGenVertexArrays(1, &VAO);
+
+    // bind vertex array object
+    glBindVertexArray(VAO);
+
+    unsigned int posVBO, posEBO, colorVBO;
+    // create the VBO on OpenGL and get a handle to it
+    glGenBuffers(1, &posEBO);
+    glGenBuffers(1, &colorVBO);
+    // bind the VBO
+    glBindBuffer(GL_ARRAY_BUFFER, posVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, posEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, colorVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(colors), colors, GL_STATIC_DRAW);
+
+    // tell how many vertices to draw
+    vertexCount = 17;//?
+
+
+    // set vertex shader attribute "aPos"
+    //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, posEBO);
+    //glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, posVBO);
+    int posSize = 3;
+    int posAttributeLocation = glGetAttribLocation(shaderProgram, "aPos");
+    glEnableVertexAttribArray(posAttributeLocation);
+    glVertexAttribPointer(posAttributeLocation, posSize, GL_FLOAT, GL_FALSE, 0, 0);
+    glBindBuffer(GL_ARRAY_BUFFER, posVBO);
+    int indSize = 3;
+    int indAttributeLocation = glGetAttribLocation(shaderProgram, "aInd");
+    glEnableVertexAttribArray(indAttributeLocation);
+    glVertexAttribPointer(indAttributeLocation, indSize, GL_FLOAT, GL_FALSE, 0, 0);
+
+    // set vertex shader attribute "aColor"
+    glBindBuffer(GL_ARRAY_BUFFER, colorVBO);
+
+    int colorSize = 3;
+    int colorAttributeLocation = glGetAttribLocation(shaderProgram, "aColor");
+
+    glEnableVertexAttribArray(colorAttributeLocation);
+    glVertexAttribPointer(colorAttributeLocation, colorSize, GL_FLOAT, GL_FALSE, 0, 0);
+
+}
 
 
 // tell opengl to draw a vertex array object (VAO) using a give shaderProgram
@@ -232,6 +357,7 @@ void draw(const unsigned int shaderProgram, const unsigned int VAO, const unsign
     glBindVertexArray(VAO);
     // draw geometry
     glDrawArrays(GL_TRIANGLES, 0, vertexCount);
+    //glDrawElements(GL_TRIANGLES, vertexCount, GL_UNSIGNED_INT, 0);
 }
 
 
@@ -248,7 +374,7 @@ void processInput(GLFWwindow *window)
 // ---------------------------------------------------------------------------------------------
 void framebufferSizeCallback(GLFWwindow* window, int width, int height)
 {
-    // make sure the viewport matches the new window dimensions; note that width and 
+    // make sure the viewport matches the new window dimensions; note that width and
     // height will be significantly larger than specified on retina displays.
     glViewport(0, 0, width, height);
 }

@@ -42,9 +42,16 @@ const unsigned int SCR_HEIGHT = 600;
 // -----------
 SceneObject planeBody;
 SceneObject planeWing;
+SceneObject planePropeller;
 
 float currentTime;
 Shader* shaderProgram;
+
+//Introduce the variables planePos (Vec2) and planeRotation (number).
+glm::vec2 planePos;
+float planeRotation;
+int rotateInXY;
+float planeSpeed = 0.005f;
 
 int main()
 {
@@ -145,9 +152,57 @@ void drawPlane(){
     // TODO 3.all create and apply your transformation matrices here
     //  you will need to transform the pose of the pieces of the plane by manipulating glm matrices and uploading a
     //  uniform mat4 model matrix to the vertex shader
+    //Change the model matrix such that the whole plane scale is reduced to
+    //1/10 of its original size.
+    glm::mat4 scale = glm::scale(0.1, 0.1,0.1);
+
+    //part of rotation
+    glm::mat4 rotation = glm::rotateZ(planeRotation);
+    //Make the plane move in its forward direction at a constant speed.
+    planePos.x += (rotation * glm::vec4(0, planeSpeed, 0, 1)).x;
+    planePos.y += (rotation * glm::vec4(0, planeSpeed, 0, 1)).y;
+
+    //If the plane flies out the visible canvas, it should be “wrapped around”
+    // (if it flies out of the left side it should appear from the right side).
+    planePos.x *=(abs(planePos.x) > 1.0f)? -1.0f: 1.0f;
+    planePos.y *=(abs(planePos.y) > 1.0f)? -1.0f: 1.0f;
+
+    //use planePos
+    glm::mat4 translation = glm::translate(planePos.x, planePos.y, 0);
+
+    // use rotateInXY 45 degrees
+    auto tilt = glm::rotateY(glm::radians<float>(rotateInXY));
+
+    // apply transformations
+    glm::mat4 model = translation * rotation * tilt * scale;
+
+    // plane assembly matrices
+    glm::mat4 mirrorX = glm::scale(-1, 1, 1);
+    glm::mat4 translateWings = glm::translate(0, -0.5, 0);
+    glm::mat4 translateProp = glm::translate(0, 0.5, 0);
+    glm::mat4 rotateProp = glm::rotateX(glm::half_pi<float>());
+    glm::mat4 scaleWing = glm::scale(0.5, 0.75, 0.5);
+    glm::mat4 animateProp = glm::rotateY(currentTime * 10);
+
+    // set uniform model
+    unsigned int modelID = glGetUniformLocation(shaderProgram->ID, "model");
+    glUniformMatrix4fv(modelID, 1, GL_FALSE, &model[0][0]);
 
     drawSceneObject(planeBody);
+    // right wing
     drawSceneObject(planeWing);
+    //left wing
+    glUniformMatrix4fv(modelID, 1, GL_FALSE, &(model * mirrorX)[0][0]);
+    drawSceneObject(planeWing);
+    //back right wing
+    glUniformMatrix4fv(modelID, 1, GL_FALSE, &(model * translateWings * scaleWing)[0][0]);
+    drawSceneObject(planeWing);
+    //back left wing
+    glUniformMatrix4fv(modelID, 1, GL_FALSE, &(model * translateWings * scaleWing * mirrorX)[0][0]);
+    drawSceneObject(planeWing);
+    // propeller
+    glUniformMatrix4fv(modelID, 1, GL_FALSE, &(model * translateProp * animateProp * rotateProp * scaleWing)[0][0]);
+    drawSceneObject(planePropeller);
 }
 
 void drawSceneObject(SceneObject obj){
@@ -166,6 +221,10 @@ void setup(){
     // initialize plane wing mesh objects
     planeWing.VAO = createVertexArray(planeWingVertices, planeWingColors, planeWingIndices);
     planeWing.vertexCount = planeWingIndices.size();
+
+    //initialize plane propeller mesh objects
+    planePropeller.VAO = createVertexArray(planePropellerVertices, planePropellerColors, planePropellerIndices);
+    planePropeller.vertexCount = planePropellerIndices.size();
 }
 
 
@@ -223,7 +282,19 @@ void processInput(GLFWwindow *window)
     // you will need to read A and D key press inputs
     // if GLFW_KEY_A is GLFW_PRESS, plane turn left
     // if GLFW_KEY_D is GLFW_PRESS, plane turn right
-
+    //The A and D keys should be used to steer the plane (by gradually rotating the
+    // plane around the z axis.
+    //If the A key is pressed the plane should also rotate -45 degrees around its
+    // local y axis. And if D key is pressed, rotate 45 degrees around its local y axis.
+    rotateInXY = 0;
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+        planeRotation += 0.02f;
+        rotateInXY = -45;
+    }
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+        planeRotation -= 0.02f;
+        rotateInXY = 45;
+    }
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
