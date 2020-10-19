@@ -1,7 +1,7 @@
 #version 330 core
 layout (location = 0) in vec3 vertex;
 layout (location = 1) in vec3 normal;
-layout (location = 2) in vec2 textCoord;
+layout (location = 2) in vec2 textCoord; // here for completness, but we are not using it just yet
 
 
 uniform mat4 model; // represents model coordinates in the world coord space
