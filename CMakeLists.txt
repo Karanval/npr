@@ -25,7 +25,7 @@ set(EXTERNAL_LIBRARIES_SOURCE_PATH ${CMAKE_SOURCE_DIR}/common/third-party)
 # ---------------------------------------------------------------------------------
 # Cmake projects
 # ---------------------------------------------------------------------------------
-project(ITU-graphics-programming)
+project(Watercolor-Rendering)
 
 set(FBX_SUPPORT OFF)
 
@@ -51,14 +51,7 @@ include_directories(
         )
 
 ## add the actual projects to build
-IF(EXISTS ${CMAKE_SOURCE_DIR}/exercises)
-    add_subdirectory(${CMAKE_SOURCE_DIR}/exercises)
+IF(EXISTS ${CMAKE_SOURCE_DIR}/watercolor)
+    add_subdirectory(${CMAKE_SOURCE_DIR}/watercolor)
 ENDIF()
 
-IF(EXISTS ${CMAKE_SOURCE_DIR}/student_projects)
-    add_subdirectory(${CMAKE_SOURCE_DIR}/student_projects)
-ENDIF()
-
-IF(EXISTS ${CMAKE_SOURCE_DIR}/assignments)
-    add_subdirectory(${CMAKE_SOURCE_DIR}/assignments)
-ENDIF()
