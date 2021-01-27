@@ -18,7 +18,7 @@ struct LightOut {vec3 specular; vec3 lightColor; vec3 dilute; float shade;};
 
 // function declarations
 // ---------------------
-void setUniforms();
+void setCommonUniforms();
 void drawObjects();
 void drawCar();
 void drawGui();
@@ -235,7 +235,7 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         watercolorShader->use();
-        setUniforms();
+        setCommonUniforms();
         //drawObjects();
         drawCar();
 
@@ -407,7 +407,7 @@ void drawGui(){
 }
 
 
-void setUniforms(){
+void setCommonUniforms(){
     // Watercolor in vertex
     watercolorShader->setVec3("light1Dir", light1.direction);
     watercolorShader->setFloat("bleedOffset", watercolorConfig.bleedOffset);

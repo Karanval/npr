@@ -15,10 +15,8 @@
 
 // function declarations
 // ---------------------
-void setCommonUniforms();
+void loadFloorTexture();
 void drawCar();
-void drawCrate();
-void drawRobot();
 void drawFloor();
 void drawGui();
 
@@ -34,11 +32,11 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 // ---------------
 const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
-const glm::vec2 texelSize = {1.0f / SCR_HEIGHT, 1.0f /SCR_WIDTH};
 
 // global variables used for rendering
 // -----------------------------------
-Shader* shader;
+Shader* carShader;
+Shader* floorShader;
 Model* carPaint;
 Model* carBody;
 Model* carInterior;
@@ -46,8 +44,7 @@ Model* carLight;
 Model* carWindow;
 Model* carWheel;
 Model* floorModel;
-Model* crate;
-Model* robot;
+unsigned int floorTextureId;
 Camera camera(glm::vec3(0.0f, 1.6f, 5.0f));
 
 // global variables used for control
@@ -62,7 +59,6 @@ bool isPaused = false; // stop camera movement when GUI is open
 struct Config {
 
     // ambient light
-    bool useLightModel = false;
     glm::vec3 ambientLightColor = {1.0f, 1.0f, 1.0f};
     float ambientLightIntensity = 0.25f;
 
@@ -76,12 +72,12 @@ struct Config {
     float ambientOcclusionMix = 1.0f;
 
     // attenuation (c0, c1 and c2 on the slides)
-    float attenuationC0 = 0.25f;
-    float attenuationC1 = 0.1f;
-    float attenuationC2 = 0.1f;
+    float attenuationC0 = 0.25;
+    float attenuationC1 = 0.1;
+    float attenuationC2 = 0.1;
 
     // TODO exercise 9.2 scale config variable
-    float uvScale = 20.0f;
+    float uvScale = 20;
 
 
     // floor texture mode
@@ -91,24 +87,6 @@ struct Config {
 
 } config;
 
-struct WatercolorConfig {
-    glm::vec3 paperColor = {1,1,1};
-    // deformations
-    bool applyDeformations = true;
-    float tremorAmount = 4.0f;
-    float tremorFront = 0.4f;
-    float tremorSpeed = 10.0f;
-    float tremorFrequency = 10.0f;
-    // reflectance
-    bool applyReflectance = true;
-    float dilute = 0.8f;
-    float cangiante = 0.2f;
-    float diluteArea = 1.0f;
-    // turbulence
-    bool applyTurbulence = true;
-    float turbulenceControl = 0.6;
-
-} watercolorConfig;
 
 
 int main()
@@ -126,7 +104,7 @@ int main()
 
     // glfw window creation
     // --------------------
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Watercolor test", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Exercise 9", NULL, NULL);
     if (window == NULL)
     {
         std::cout << "Failed to create GLFW window" << std::endl;
@@ -149,16 +127,22 @@ int main()
         return -1;
     }
 
-    shader = new Shader("shaders/shader.vert", "shaders/shader.frag");
+
+    // ---------
+    // floor texture
+    glGenTextures(1, &floorTextureId);
+    loadFloorTexture();
+
+
+    carShader = new Shader("shaders/car_shader.vert", "shaders/car_shader.frag");
+    floorShader = new Shader("shaders/floor_Shader.vert", "shaders/floor_Shader.frag");
 	carPaint = new Model("car/Paint_LOD0.obj");
 	carBody = new Model("car/Body_LOD0.obj");
 	carLight = new Model("car/Light_LOD0.obj");
 	carInterior = new Model("car/Interior_LOD0.obj");
 	carWindow = new Model("car/Windows_LOD0.obj");
 	carWheel = new Model("car/Wheel_LOD0.obj");
-	floorModel = new Model("floor/floor.obj");
-	crate = new Model("box/crate.obj");
-	robot  = new Model("robot/RIGING_MODEL_04.obj");
+	floorModel = new Model("floor/floor_no_material.obj");
 
     // set up the z-buffer
     glDepthRange(-1,1); // make the NDC a right handed coordinate system, with the camera pointing towards -z
@@ -180,17 +164,11 @@ int main()
 
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    glDrawBuffer( GL_COLOR_ATTACHMENT1 );
-    glm::vec3 clearVec( 0.0, 0.0, -1.0f );
-// from normalized vector to rgb color; from [-1,1] to [0,1]
-    clearVec = (clearVec + glm::vec3(1.0f, 1.0f, 1.0f)) * 0.5f;
-    glClearColor( clearVec.x, clearVec.y, clearVec.z, 0.0f );
-    glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
     // render loop
     while (!glfwWindowShouldClose(window))
     {
         static float lastFrame = 0.0f;
-        float currentFrame = (float)glfwGetTime();
+        float currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
@@ -199,15 +177,9 @@ int main()
         glClearColor(0.3f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        shader->use();
-        shader->setFloat("time", lastFrame);
-        shader->setVec2("texelSize", texelSize);
 
-        setCommonUniforms();
         drawFloor();
         drawCar();
-        drawCrate();
-        drawRobot();
 		if (isPaused) {
 			drawGui();
 		}
@@ -229,9 +201,8 @@ int main()
 	delete carLight;
 	delete carBody;
     delete carWheel;
-    delete crate;
-    delete robot;
-    delete shader;
+    delete floorShader;
+    delete carShader;
 
     // glfw: terminate, clearing all previously allocated GLFW resources.
     // ------------------------------------------------------------------
@@ -239,49 +210,48 @@ int main()
     return 0;
 }
 
-///////////////////////////
-// TAKE CARE OF UNIFORMS //
-///////////////////////////
-void setCommonUniforms() {
+// ------------------------------------
+// TODO EXERCISE 9.1 LOAD FLOOR TEXTURE
+// ------------------------------------
 
-    // light uniforms
-    shader->setVec3("ambientLightColor", config.ambientLightColor * config.ambientLightIntensity);
-    shader->setVec3("lightPosition", config.lightPosition);
-    shader->setVec3("lightColor", config.lightColor * config.lightIntensity);
+void loadFloorTexture(){
+    // TODO this is mostly a copy and paste of the function 'TextureFromFile' in the 'model.h' file
+    //  however, you should use the min/mag/wrap settings that you can control in the user interface
+    //  and load the texture 'floor/checkboard_texture.png'
 
-    // material uniforms
-    shader->setFloat("ambientOcclusionMix", config.ambientOcclusionMix);
-    shader->setFloat("specularExponent", config.specularExponent);
+    int width, height, nrComponents;
+    unsigned char *data = stbi_load("floor/checkboard_texture.png", &width, &height, &nrComponents, 0);
+    if (data) {
+        GLenum format = GL_RGB;
+//        if (nrComponents == 1)
+//            format = GL_RED;
+//        else if (nrComponents == 3)
+//            format = GL_RGB;
+//        else if (nrComponents == 4)
+//            format = GL_RGBA;
 
-    // attenuation uniforms
-    shader->setFloat("attenuationC0", config.attenuationC0);
-    shader->setFloat("attenuationC1", config.attenuationC1);
-    shader->setFloat("attenuationC2", config.attenuationC2);
+        glBindTexture(GL_TEXTURE_2D, floorTextureId);
+        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
 
-    // Send uvScale uniform
-    shader->setFloat("uvScale", config.uvScale);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, config.wrapSetting);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, config.wrapSetting);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, config.minFilterSetting);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, config.magFilterSetting);
 
-    // WATERCOLOR
-    // deformations
-    shader->setBool("applyDeformations", watercolorConfig.applyDeformations);
-    shader->setFloat("tremorAmount", watercolorConfig.tremorAmount);
-    shader->setFloat("tremorSpeed", watercolorConfig.tremorSpeed);
-    shader->setFloat("tremorFrequency", watercolorConfig.tremorFrequency);
-    shader->setFloat("tremorFront", watercolorConfig.tremorFront);
-    // reflectance
-    shader->setBool("applyReflectance", watercolorConfig.applyReflectance);
-    shader->setFloat("dilution", watercolorConfig.dilute);
-    shader->setFloat("cangiante", watercolorConfig.cangiante);
-    shader->setFloat("diluteArea", watercolorConfig.diluteArea);
-    shader->setVec3("paperColor", watercolorConfig.paperColor);
-    // turbulence
-    shader->setBool("applyReflectance", watercolorConfig.applyReflectance);
-    shader->setFloat("turbulenceControl", watercolorConfig.turbulenceControl);
+        stbi_image_free(data);
+    }
+    else
+    {
+        std::cout << "Texture failed to load" << std::endl;
+        stbi_image_free(data);
+    }
 }
 
-///////////////////////////
-//    DRAW FUNCTIONS     //
-///////////////////////////
+// --------------
+// DRAW FUNCTIONS
+// --------------
+
 void drawGui(){
     // Start the Dear ImGui frame
     ImGui_ImplOpenGL3_NewFrame();
@@ -291,35 +261,13 @@ void drawGui(){
     {
         ImGui::Begin("Settings");
 
-        ImGui::Text("Deformations");
-        ImGui::Checkbox("Apply deformations", &watercolorConfig.applyDeformations);
-        ImGui::SliderFloat("Tremor amount", &watercolorConfig.tremorAmount, 0, 10);
-        //ImGui::SliderFloat("Tremor front", &watercolorConfig.tremorFront, 0, 1);
-        ImGui::SliderFloat("Tremor speed", &watercolorConfig.tremorSpeed, 0, 100);
-        ImGui::SliderFloat("Tremor frequency", &watercolorConfig.tremorFrequency, 0, 100);
-        ImGui::SliderFloat("Tremor front", &watercolorConfig.tremorFront, 0, 1);
-        ImGui::Separator();
-
-        ImGui::Text("Reflectance");
-        ImGui::Checkbox("Apply reflectance", &watercolorConfig.applyReflectance);
-        ImGui::SliderFloat("Dilute", &watercolorConfig.dilute, 0, 1);
-        ImGui::SliderFloat("Cangiante", &watercolorConfig.cangiante, 0, 1);
-        ImGui::SliderFloat("Dilute area", &watercolorConfig.diluteArea, 0, 1);
-        ImGui::ColorEdit3("Paper color", (float*)&watercolorConfig.paperColor);
-//        ImGui::Separator();
-        ImGui::Text("Turbulence");
-        ImGui::Checkbox("Apply turbulence", &watercolorConfig.applyTurbulence);
-        ImGui::SliderFloat("Turbulence control", &watercolorConfig.turbulenceControl, 0.01, 0.99);
-        ImGui::Separator();
-
         ImGui::Text("Ambient light: ");
-        ImGui::Checkbox("Use light model", &config.useLightModel);
         ImGui::ColorEdit3("ambient light color", (float*)&config.ambientLightColor);
         ImGui::SliderFloat("ambient light intensity", &config.ambientLightIntensity, 0.0f, 1.0f);
         ImGui::Separator();
 
         ImGui::Text("Light 1: ");
-        ImGui::DragFloat3("light 1 position", (float*)&config.lightPosition, 0.1f, -20.0f, 20.0f);
+        ImGui::DragFloat3("light 1 position", (float*)&config.lightPosition, .1, -20, 20);
         ImGui::ColorEdit3("light 1 color", (float*)&config.lightColor);
         ImGui::SliderFloat("light 1 intensity", &config.lightIntensity, 0.0f, 1.0f);
         ImGui::Separator();
@@ -335,6 +283,28 @@ void drawGui(){
         ImGui::SliderFloat("attenuation c2", &config.attenuationC2, 0.0f, 1.0f);
         ImGui::Separator();
 
+        ImGui::Text("Wrap setting: ");
+        if(ImGui::RadioButton("CLAMP_TO_EDGE", config.wrapSetting == GL_CLAMP_TO_EDGE)) {config.wrapSetting = GL_CLAMP_TO_EDGE;loadFloorTexture();} ImGui::SameLine();
+        if(ImGui::RadioButton("CLAMP_TO_BORDER", config.wrapSetting == GL_CLAMP_TO_BORDER)) {config.wrapSetting = GL_CLAMP_TO_BORDER;loadFloorTexture();}
+        if(ImGui::RadioButton("MIRRORED_REPEAT", config.wrapSetting == GL_MIRRORED_REPEAT)) {config.wrapSetting = GL_MIRRORED_REPEAT;loadFloorTexture();} ImGui::SameLine();
+        if(ImGui::RadioButton("REPEAT", config.wrapSetting == GL_REPEAT)) {config.wrapSetting = GL_REPEAT;loadFloorTexture();};
+        ImGui::Separator();
+
+        ImGui::Text("Minifying setting: ");
+        if(ImGui::RadioButton("NEAREST", config.minFilterSetting == GL_NEAREST )) {config.minFilterSetting = GL_NEAREST ;loadFloorTexture();} ImGui::SameLine();
+        if(ImGui::RadioButton("LINEAR", config.minFilterSetting == GL_LINEAR )) {config.minFilterSetting = GL_LINEAR ;loadFloorTexture();}
+        if(ImGui::RadioButton("NEAREST_MIPMAP_NEAREST", config.minFilterSetting == GL_NEAREST_MIPMAP_NEAREST )) {config.minFilterSetting = GL_NEAREST_MIPMAP_NEAREST ;loadFloorTexture();} ImGui::SameLine();
+        if(ImGui::RadioButton("LINEAR_MIPMAP_NEAREST", config.minFilterSetting == GL_LINEAR_MIPMAP_NEAREST )) {config.minFilterSetting = GL_LINEAR_MIPMAP_NEAREST ;loadFloorTexture();}
+        if(ImGui::RadioButton("NEAREST_MIPMAP_LINEAR", config.minFilterSetting == GL_NEAREST_MIPMAP_LINEAR )) {config.minFilterSetting = GL_NEAREST_MIPMAP_LINEAR ;loadFloorTexture();} ImGui::SameLine();
+        if(ImGui::RadioButton("LINEAR_MIPMAP_LINEAR", config.minFilterSetting == GL_LINEAR_MIPMAP_LINEAR )) {config.minFilterSetting = GL_LINEAR_MIPMAP_LINEAR ;loadFloorTexture();}
+        ImGui::Separator();
+
+        ImGui::Text("Magnifying setting: ");
+        if(ImGui::RadioButton("NEAREST##2", config.magFilterSetting == GL_NEAREST )) {config.magFilterSetting = GL_NEAREST ;loadFloorTexture();} ImGui::SameLine();
+        if(ImGui::RadioButton("LINEAR##2", config.magFilterSetting == GL_LINEAR )) {config.magFilterSetting = GL_LINEAR ;loadFloorTexture();}
+        ImGui::Separator();
+
+        // TODO exercise 9.2 add slider to control uvScale
         ImGui::SliderFloat("uv scale", &config.uvScale, 1.0f, 100.0f);
         ImGui::Separator();
 
@@ -348,122 +318,122 @@ void drawGui(){
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
-void drawFloor(){
 
-    shader->setBool("applyDeformations", false);
+void drawFloor(){
+    floorShader->use();
+    // light uniforms
+    floorShader->setVec3("ambientLightColor", config.ambientLightColor * config.ambientLightIntensity);
+    floorShader->setVec3("lightPosition", config.lightPosition);
+    floorShader->setVec3("lightColor", config.lightColor * config.lightIntensity);
+
+    // material uniforms
+    floorShader->setFloat("specularExponent", config.specularExponent);
+
+    // attenuation uniforms
+    floorShader->setFloat("attenuationC0", config.attenuationC0);
+    floorShader->setFloat("attenuationC1", config.attenuationC1);
+    floorShader->setFloat("attenuationC2", config.attenuationC2);
+
+    // TODO exercise 9.2 send uvScale to the shader as a uniform variable
+    floorShader->setFloat("uvScale", config.uvScale);
+
+
     // camera parameters
     glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
     glm::mat4 view = camera.GetViewMatrix();
     glm::mat4 viewProjection = projection * view;
 
     // set projection matrix uniform
-    shader->setMat4("projection", projection);
-    shader->setMat4("view", view);
+    floorShader->setMat4("projection", projection);
 
+    glActiveTexture(GL_TEXTURE0);
+    floorShader->setInt("texture_diffuse1", 0);
+    glBindTexture(GL_TEXTURE_2D, floorTextureId);
     // draw floor,
     // notice that we overwrite the value of one of the uniform variables to set a different floor color
-    shader->setVec3("reflectionColor", .2, .5, .2);
+    floorShader->setVec3("reflectionColor", .2, .5, .2);
     glm::mat4 model = glm::scale(glm::mat4(1.0), glm::vec3(5.f, 5.f, 5.f));
-    shader->setMat4("model", model);
+    floorShader->setMat4("model", model);
     glm::mat4 invTranspose = glm::inverse(glm::transpose(view * model));
-    shader->setMat4("invTranspMV", invTranspose);
-    floorModel->Draw(*shader);
+    floorShader->setMat4("invTranspMV", invTranspose);
+    floorShader->setMat4("view", view);
+    floorModel->Draw(*floorShader);
 }
 
 
 void drawCar(){
-    shader->setBool("applyDeformations", watercolorConfig.applyDeformations);
+    carShader->use();
+    // light uniforms
+    carShader->setVec3("ambientLightColor", config.ambientLightColor * config.ambientLightIntensity);
+    carShader->setVec3("lightPosition", config.lightPosition);
+    carShader->setVec3("lightColor", config.lightColor * config.lightIntensity);
+
+    // material uniforms
+    carShader->setFloat("ambientOcclusionMix", config.ambientOcclusionMix);
+    carShader->setFloat("specularExponent", config.specularExponent);
+
+    // attenuation uniforms
+    carShader->setFloat("attenuationC0", config.attenuationC0);
+    carShader->setFloat("attenuationC1", config.attenuationC1);
+    carShader->setFloat("attenuationC2", config.attenuationC2);
+
+
     // camera parameters
     glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
     glm::mat4 view = camera.GetViewMatrix();
-    glm::mat4 viewInv = glm::inverse(view);
-    glm::mat4 viewProjection = projection * view;
+    //glm::mat4 viewProjection = projection * view;
+
     // set projection matrix uniform
-    shader->setMat4("projection", projection);
-    shader->setMat4("view", view);
-    shader->setMat4("viewInv", viewInv);
+    carShader->setMat4("projection", projection);
 
     // draw wheel
     glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(-.7432, .328, 1.39));
-    shader->setMat4("model", model);
+    carShader->setMat4("model", model);
     glm::mat4 invTranspose = glm::inverse(glm::transpose(view * model));
-    shader->setMat4("invTranspMV", invTranspose);
-    carWheel->Draw(*shader);
+    carShader->setMat4("invTranspMV", invTranspose);
+    carShader->setMat4("view", view);
+    carWheel->Draw(*carShader);
 
     // draw wheel
     model = glm::translate(glm::mat4(1.0f), glm::vec3(-.7432, .328, -1.296));
-    shader->setMat4("model", model);
+    carShader->setMat4("model", model);
     invTranspose = glm::inverse(glm::transpose(view * model));
-    shader->setMat4("invTranspMV", invTranspose);
-    carWheel->Draw(*shader);
+    carShader->setMat4("invTranspMV", invTranspose);
+    carShader->setMat4("view", view);
+    carWheel->Draw(*carShader);
 
     // draw wheel
     model = glm::rotate(glm::mat4(1.0f), glm::pi<float>(), glm::vec3(0.0, 1.0, 0.0));
     model = glm::translate(model, glm::vec3(-.7432, .328, 1.296));
-    shader->setMat4("model", model);
+    carShader->setMat4("model", model);
     invTranspose = glm::inverse(glm::transpose(view * model));
-    shader->setMat4("invTranspMV", invTranspose);
-    carWheel->Draw(*shader);
+    carShader->setMat4("invTranspMV", invTranspose);
+    carShader->setMat4("view", view);
+    carWheel->Draw(*carShader);
 
     // draw wheel
     model = glm::rotate(glm::mat4(1.0f), glm::pi<float>(), glm::vec3(0.0, 1.0, 0.0));
     model = glm::translate(model, glm::vec3(-.7432, .328, -1.39));
-    shader->setMat4("model", model);
+    carShader->setMat4("model", model);
     invTranspose = glm::inverse(glm::transpose(view * model));
-    shader->setMat4("invTranspMV", invTranspose);
-    carWheel->Draw(*shader);
+    carShader->setMat4("invTranspMV", invTranspose);
+    carShader->setMat4("view", view);
+    carWheel->Draw(*carShader);
 
     // draw the rest of the car
     model = glm::mat4(1.0f);
-    shader->setMat4("model", model);
+    carShader->setMat4("model", model);
     invTranspose = glm::inverse(glm::transpose(view * model));
-    shader->setMat4("invTranspMV", invTranspose);
-    carBody->Draw(*shader);
-    carInterior->Draw(*shader);
-    carPaint->Draw(*shader);
-    carLight->Draw(*shader);
+    carShader->setMat4("invTranspMV", invTranspose);
+    carShader->setMat4("view", view);
+    carBody->Draw(*carShader);
+    carInterior->Draw(*carShader);
+    carPaint->Draw(*carShader);
+    carLight->Draw(*carShader);
     glEnable(GL_BLEND);
-    carWindow->Draw(*shader);
+    carWindow->Draw(*carShader);
     glDisable(GL_BLEND);
 
-}
-
-void drawCrate() {
-    // camera parameters
-    glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-    glm::mat4 view = camera.GetViewMatrix();
-    glm::mat4 viewInv = glm::inverse(view);
-    glm::mat4 viewProjection = projection * view;
-    // set projection matrix uniform
-    shader->setMat4("projection", projection);
-    shader->setMat4("view", view);
-    shader->setMat4("viewInv", viewInv);
-
-
-    glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(3, 1, 1.39));
-    shader->setMat4("model", model);
-    glm::mat4 invTranspose = glm::inverse(glm::transpose(view * model));
-    shader->setMat4("invTranspMV", invTranspose);
-    crate->Draw(*shader);
-}
-
-void drawRobot() {
-    // camera parameters
-    glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-    glm::mat4 view = camera.GetViewMatrix();
-    glm::mat4 viewInv = glm::inverse(view);
-    glm::mat4 viewProjection = projection * view;
-    // set projection matrix uniform
-    shader->setMat4("projection", projection);
-    shader->setMat4("view", view);
-    shader->setMat4("viewInv", viewInv);
-
-
-    glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(-2, 0.28, 1.39));
-    shader->setMat4("model", model);
-    glm::mat4 invTranspose = glm::inverse(glm::transpose(view * model));
-    shader->setMat4("invTranspMV", invTranspose);
-    robot->Draw(*shader);
 }
 
 // ---------------

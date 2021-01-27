@@ -142,7 +142,6 @@ private:
                 indices.push_back(face.mIndices[j]);
         }
         // process materials
-//        std::cout << "SCENEEEEEE " << scene->HasMaterials() << std::endl;
         aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
         // we assume a convention for sampler names in the shaders. Each diffuse texture should be named
         // as 'texture_diffuseN' where N is a sequential number ranging from 1 to MAX_SAMPLER_NUMBER.
@@ -191,8 +190,6 @@ private:
             if(!skip)
             {   // if texture hasn't been loaded already, load it
                 Texture texture;
-//                std::cout << "PATH FOUND: " << str.C_Str() << std::endl;
-//                std::cout << "type FOUND: " << typeName << std::endl;
                 texture.id = TextureFromFile(str.C_Str(), this->directory);
                 texture.type = typeName;
                 texture.path = str.C_Str();

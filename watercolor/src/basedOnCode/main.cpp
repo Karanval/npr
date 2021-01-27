@@ -117,7 +117,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 
 // function declarations
 // ---------------------
-void setUniforms();
+void setCommonUniforms();
 void drawObjects();
 void drawCar();
 void drawGui();
@@ -239,7 +239,7 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         watercolorShader->use();
-        setUniforms();
+        setCommonUniforms();
         drawFloor();
         drawCar();
 		if (isPaused) {
@@ -271,7 +271,7 @@ int main()
     return 0;
 }
 
-void setUniforms(){
+void setCommonUniforms(){
     //USED ON VERTEX
     // Watercolor in vertex
     watercolorShader->setFloat("bleedOffset", watercolorConfig.bleedOffset);
