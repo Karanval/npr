@@ -25,7 +25,7 @@ set(EXTERNAL_LIBRARIES_SOURCE_PATH ${CMAKE_SOURCE_DIR}/common/third-party)
 # ---------------------------------------------------------------------------------
 # Cmake projects
 # ---------------------------------------------------------------------------------
-project(Watercolor-Rendering)
+project(Final-Project)
 
 set(FBX_SUPPORT OFF)
 
@@ -53,5 +53,9 @@ include_directories(
 ## add the actual projects to build
 IF(EXISTS ${CMAKE_SOURCE_DIR}/watercolor)
     add_subdirectory(${CMAKE_SOURCE_DIR}/watercolor)
+ENDIF()
+
+IF(EXISTS ${CMAKE_SOURCE_DIR}/nprRendering)
+    add_subdirectory(${CMAKE_SOURCE_DIR}/nprRendering)
 ENDIF()
 
