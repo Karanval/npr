@@ -48,8 +48,6 @@ const float quadVertices[] = {
         1.0f, -1.0f,  1.0f, 0.0f,
         1.0f,  1.0f,  1.0f, 1.0f
 };
-
-
 // global variables used for rendering //
 // ----------------------------------- //
 Shader* celShader;
@@ -64,7 +62,7 @@ Model* carWheel;
 Model* floorModel;
 Model* crate;
 Model* robot;
-Camera camera(glm::vec3(0.0f, 1.6f, 5.0f));
+Camera camera(glm::vec3(0.0f, 1.2f, 5.0f));
 
 // global variables used for control //
 // --------------------------------- //
@@ -81,35 +79,32 @@ unsigned int edgeVAO, screenVAO;
 // Helper structs //
 // -------------- //
 struct Config {
-
     // ambient light
     glm::vec3 ambientLightColor = {1.0f, 1.0f, 1.0f};
     float ambientLightIntensity = 0.25f;
 
-    // light 1
-    glm::vec3 lightPosition = {1.2f, 2.5f, 0.8f};
-    glm::vec3 lightColor = {1.0f, 1.0f, 1.0f};
+    // light
+    glm::vec3 lightDirection = {2.7f, 0.3f, 0.7};
+    glm::vec3 lightColor = {0.85f, 0.8f, 0.6f};
     float lightIntensity = 0.75f;
 
     // material
-    glm::vec3 reflectionColor = {1.0f, 1.0f, 0.0f};
-    float ambientReflectance = 0.5f;
-    float diffuseReflectance = 0.5f;
-    float specularReflectance = 0.7f;
-    float specularExponent = 20.0f;
+    float specularExponent = 27.0f;
+    float ambientOcclusionMix = 1.0f;
+    float normalMappingMix = 1.0f;
+    float reflectionMix = 0.15f;
 
-    // attenuation (c0, c1 and c2 on the slides)
-    float attenuationC0 = 0.25f;
-    float attenuationC1 = 0.1f;
-    float attenuationC2 = 0.1f;
-
-    // Image distortion TODO: use
+    // Image distortion
     bool doCelShading = true;
     bool doEdgeDetection = false;
     bool doLineTremor = false;
-    float tremorAmount = 0.01; // noiseAmp
+    bool useBPSR = false;
+    float lineDistortion = 0.1; // noiseAmp
     int celAmount = 4;
     bool justLines = false;
+    float strokeSize = 2;
+    bool normalizeDistortion = false;
+    bool randomize = false;
 
 } config;
 
@@ -124,7 +119,7 @@ int main()
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
 #ifdef __APPLE__
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // uncomment this statement to fix compilation on OS X
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
 
     // glfw window creation //
@@ -157,18 +152,6 @@ int main()
     // Initialize scene objects (models and gl) //
     // ---------------------------------------- //
     celShader = new Shader("shaders/celShader.vert", "shaders/celShader.frag");
-
-    edgeShader = new Shader("shaders/edgeShader.vert", "shaders/edgeShader.frag");
-	edgeShader->use();
-	edgeShader->setInt("celTexture", 0);
-
-	screenShader = new Shader("shaders/screenShader.vert", "shaders/screenShader.frag");
-    screenShader->use();
-    screenShader->setInt("edgeTexture", 0);
-    unsigned int noiseTexture;
-    noiseTexture = createTexture("perlinNoise.png");
-    screenShader->setInt("noiseTexture", 1);
-
     carPaint = new Model("car/Paint_LOD0.obj");
 	carBody = new Model("car/Body_LOD0.obj");
 	carLight = new Model("car/Light_LOD0.obj");
@@ -177,12 +160,35 @@ int main()
 	carWheel = new Model("car/Wheel_LOD0.obj");
 	floorModel = new Model("floor/floor.obj");
 	crate = new Model("box/crate.obj");
-	robot  = new Model("robot/RIGING_MODEL_04.obj");
+	//robot  = new Model("robot/RIGING_MODEL_04.obj");
 
-    edgeVAO = createVAO();
-    screenVAO = createVAO();
     setCelFramebuffer();
     setEdgeFramebuffer();
+
+    // screen quad VAO
+    unsigned int quadVAO, quadVBO;
+    glGenVertexArrays(1, &quadVAO);
+    glGenBuffers(1, &quadVBO);
+    glBindVertexArray(quadVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+
+    edgeShader = new Shader("shaders/edgeShader.vert", "shaders/edgeShader.frag");
+    edgeShader->use();
+    edgeShader->setInt("celTexture", 0);
+//    edgeVAO = createVAO();
+
+    screenShader = new Shader("shaders/screenShader.vert", "shaders/screenShader.frag");
+    screenShader->use();
+    screenShader->setInt("edgeTexture", 0);
+    unsigned int noiseTexture;
+    noiseTexture = createTexture("perlinNoise.png");
+    screenShader->setInt("noiseTexture", 1);
+//    screenVAO = createVAO();
 
     // IMGUI init
     IMGUI_CHECKVERSION();
@@ -193,7 +199,10 @@ int main()
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 330 core");
 
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // draw as wireframe
+//    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
     // RENDER LOOP //
     // ----------- //
@@ -208,8 +217,8 @@ int main()
 
         setCommonUniforms();
         /// first pass, normal render with cel framebuffer
-        glBindFramebuffer(GL_FRAMEBUFFER, celFramebuffer);
-//        glBindFramebuffer(GL_FRAMEBUFFER, 0);// if active TODO change back
+//        glBindFramebuffer(GL_FRAMEBUFFER, celFramebuffer);
+        glBindFramebuffer(GL_FRAMEBUFFER, celFramebuffer);// if active TODO change back
         glDepthRange(-1,1); // make the NDC a right handed coordinate system, with the camera pointing towards -z
         glEnable(GL_DEPTH_TEST); // turn on z-buffer depth test
         glDepthFunc(GL_LESS); // draws fragments that are closer to the screen in NDC
@@ -219,27 +228,28 @@ int main()
         drawFloor();
         drawCar();
         drawCrate();
-        drawRobot();
+        //drawRobot();
         /// second pass, render to texture with edge framebuffer
-//        glBindFramebuffer(GL_FRAMEBUFFER, edgeFramebuffer);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);// if active TODO change back
+        glBindFramebuffer(GL_FRAMEBUFFER, edgeFramebuffer);
+//        glBindFramebuffer(GL_FRAMEBUFFER, 0);// if active TODO change back
         glDisable(GL_DEPTH_TEST);
         glClearColor(0.3f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
         edgeShader->use();
-        glBindVertexArray(edgeVAO);
-        glBindTexture(GL_TEXTURE_2D, celTexture);
+        glBindVertexArray(quadVAO);
+        glBindTexture(GL_TEXTURE_2D, celTexture);	// use the color attachment texture as the texture of the quad plane
         glDrawArrays(GL_TRIANGLES, 0, 6);
         /// third pass, render to quad with default framebuffer
-//        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-//        glDisable(GL_DEPTH_TEST);
-//        glClearColor(0.3f, 0.3f, 0.3f, 1.0f);
-//        glClear(GL_COLOR_BUFFER_BIT);
-//        screenShader->use();
-//        glBindVertexArray(screenVAO);
-//        glBindTexture(GL_TEXTURE_2D, edgeTexture); // also bind noise
-//        glBindTexture(GL_TEXTURE_2D, noiseTexture); // also bind noise
-//        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glDisable(GL_DEPTH_TEST);
+        glClearColor(0.3f, 0.3f, 0.3f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+        screenShader->use();
+        glBindVertexArray(quadVAO);
+        glBindTexture(GL_TEXTURE_2D, edgeTexture); // also bind noise
+        glActiveTexture(GL_TEXTURE0 + 1);
+        glBindTexture(GL_TEXTURE_2D, noiseTexture); // also bind noise
+        glDrawArrays(GL_TRIANGLES, 0, 6);
 
 		if (isPaused) {
 			drawGui();
@@ -278,34 +288,33 @@ int main()
 ///////////////////////////
 void setCommonUniforms() {
     celShader->use();
+    celShader->setVec3("viewPosition", camera.Position);
     // light uniforms
-//    celShader->setVec3("ambientLightColor", config.ambientLightColor * config.ambientLightIntensity);
-    celShader->setVec3("lightPosition", config.lightPosition);
-//    celShader->setVec3("lightColor", config.lightColor * config.lightIntensity);
+    celShader->setVec3("ambientLightColor", config.ambientLightColor * config.ambientLightIntensity);
+    celShader->setVec3("lightDirection", config.lightDirection);
+    celShader->setVec3("lightColor", config.lightColor * config.lightIntensity);
 
     // material uniforms
-//    celShader->setVec3("reflectionColor", config.reflectionColor);
-//    celShader->setFloat("ambientReflectance", config.ambientReflectance);
-//    celShader->setFloat("diffuseReflectance", config.diffuseReflectance);
-//    celShader->setFloat("specularReflectance", config.specularReflectance);
-//    celShader->setFloat("specularExponent", config.specularExponent);
-
-    // attenuation uniforms
-//    celShader->setFloat("attenuationC0", config.attenuationC0);
-//    celShader->setFloat("attenuationC1", config.attenuationC1);
-//    celShader->setFloat("attenuationC2", config.attenuationC2);
+    celShader->setFloat("ambientOcclusionMix", config.ambientOcclusionMix);
+    celShader->setFloat("normalMappingMix", config.normalMappingMix);
+    celShader->setFloat("specularExponent", config.specularExponent);
 
     // NPR
     celShader->setBool("doCelShading", config.doCelShading);
     celShader->setInt("celAmount", config.celAmount);
+    celShader->setBool("useBPSR", config.useBPSR);
 
     edgeShader->use();
     edgeShader->setBool("doEdgeDetection", config.doEdgeDetection);
+    edgeShader->setBool("doEdgeOnly", config.justLines);
     edgeShader->setVec2("texelSize", texelSize);
+    edgeShader->setFloat("strokeSize", config.strokeSize);
 
     screenShader->use();
     screenShader->setBool("doLineTremor", config.doLineTremor);
-    screenShader->setFloat("tremorAmount", config.tremorAmount);
+    screenShader->setBool("normalizeDistortion", config.normalizeDistortion);
+    screenShader->setBool("randomize", config.randomize);
+    screenShader->setFloat("lineDistortion", config.lineDistortion/100);
 }
 
 void setCelFramebuffer() {
@@ -318,16 +327,14 @@ void setCelFramebuffer() {
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glBindTexture(GL_TEXTURE_2D, 0); // needed?
+//    glBindTexture(GL_TEXTURE_2D, 0); // needed?
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, celTexture, 0);
 
     // generate renderbuffer for depth and stencil testing
     glGenRenderbuffers(1, &celRbo);
     glBindRenderbuffer(GL_RENDERBUFFER, celRbo);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT);
-    glBindRenderbuffer(GL_RENDERBUFFER, 0);
-
-    // attach texture and rbo to current bound framebuffer obj
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, celTexture, 0);
+//    glBindRenderbuffer(GL_RENDERBUFFER, 0);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, celRbo);
 
     // check that framebuffer is complete
@@ -364,23 +371,6 @@ void setEdgeFramebuffer() {
         std::cout << "ERROR::EDGE FRAMEBUFFER:: Framebuffer is not complete" << std::endl;
     // unbind, and bind back to default
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-}
-
-unsigned int createVAO() {
-    unsigned int VAO, VBO;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
-
-    // setting attributes position and texCoord
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-    return VAO;
 }
 
 unsigned int createTexture(char const * path) {
@@ -430,37 +420,37 @@ void drawGui(){
     {
         ImGui::Begin("Settings");
 
-        ImGui::Text("Ambient light");
-        ImGui::ColorEdit3("Ambient light color", (float*)&config.ambientLightColor);
-        ImGui::SliderFloat("Ambient light intensity", &config.ambientLightIntensity, 0.0f, 1.0f);
+        ImGui::Text("Ambient light: ");
+        ImGui::ColorEdit3("ambient light color", (float*)&config.ambientLightColor);
+        ImGui::SliderFloat("ambient light intensity", &config.ambientLightIntensity, 0.0f, 1.0f);
         ImGui::Separator();
 
-        ImGui::Text("Light");
-        ImGui::DragFloat3("Light position", (float*)&config.lightPosition, 0.1f, -20.0f, 20.0f);
-        ImGui::ColorEdit3("Light color", (float*)&config.lightColor);
-        ImGui::SliderFloat("Light intensity", &config.lightIntensity, 0.0f, 1.0f);
+        ImGui::Text("Light 1: ");
+        ImGui::DragFloat3("light 1 direction", (float*)&config.lightDirection, .1, -20, 20);
+        ImGui::ColorEdit3("light 1 color", (float*)&config.lightColor);
+        ImGui::SliderFloat("light 1 intensity", &config.lightIntensity, 0.0f, 1.0f);
         ImGui::Separator();
 
-        ImGui::Text("Material");
-        ImGui::ColorEdit3("Reflection color", (float*)&config.reflectionColor);
-        ImGui::SliderFloat("Ambient reflectance", &config.ambientReflectance, 0.0f, 1.0f);
-        ImGui::SliderFloat("Diffuse reflectance", &config.diffuseReflectance, 0.0f, 1.0f);
-        ImGui::SliderFloat("Specular reflectance", &config.specularReflectance, 0.0f, 1.0f);
-        ImGui::SliderFloat("specular exponent", &config.specularExponent, 0.1f, 300.0f);
-        ImGui::Separator();
-
-        ImGui::Text("Attenuation");
-        ImGui::SliderFloat("Attenuation c0", &config.attenuationC0, 0.0f, 1.0f);
-        ImGui::SliderFloat("Attenuation c1", &config.attenuationC1, 0.0f, 1.0f);
-        ImGui::SliderFloat("Attenuation c2", &config.attenuationC2, 0.0f, 1.0f);
+        ImGui::Text("Material: ");
+        ImGui::SliderFloat("ambient occlusion mix", &config.ambientOcclusionMix, 0.0f, 1.0f);
+        ImGui::SliderFloat("normal mapping mix", &config.normalMappingMix, 0.0f, 1.0f);
+        ImGui::SliderFloat("reflection mix", &config.reflectionMix, 0.0f, 1.0f);
+        ImGui::SliderFloat("specular exponent", &config.specularExponent, 0.0f, 150.0f);
         ImGui::Separator();
 
         ImGui::Text("NPR");
         ImGui::Checkbox("Do cel shading", &config.doCelShading);
-        ImGui::Checkbox("Do edge detection", &config.doEdgeDetection);
-        ImGui::Checkbox("Do line tremor", &config.doLineTremor);
+        ImGui::Checkbox("Use blinn-phong specular", &config.useBPSR);
         ImGui::SliderInt("Cel shading divisions", &config.celAmount, 3, 20);
-        ImGui::SliderFloat("Line tremor amount", &config.tremorAmount, 0.0f, 1.0f);
+        ImGui::Separator();
+        ImGui::Checkbox("Do edge detection", &config.doEdgeDetection);
+        ImGui::Checkbox("Show only edges", &config.justLines);
+        ImGui::SliderFloat("Stroke size", &config.strokeSize, 0.0f, 5.0f);
+        ImGui::Separator();
+        ImGui::Checkbox("Do line distortion", &config.doLineTremor);
+        ImGui::Checkbox("Normalize distortion", &config.normalizeDistortion);
+        ImGui::Checkbox("Randomize", &config.randomize);
+        ImGui::SliderFloat("Line distortion", &config.lineDistortion, 0.0f, 2.0f);
         ImGui::Separator();
 
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
@@ -471,9 +461,9 @@ void drawGui(){
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
-void drawFloor(){
+void drawFloor(){edgeShader->use();
+    edgeShader->setBool("doEdgeDetection", false);
     celShader->use();
-    celShader->setBool("applyDeformations", false);
     // camera parameters
     glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
     glm::mat4 view = camera.GetViewMatrix();
@@ -488,12 +478,12 @@ void drawFloor(){
     celShader->setVec3("reflectionColor", .2, .5, .2);
     glm::mat4 model = glm::scale(glm::mat4(1.0), glm::vec3(5.f, 5.f, 5.f));
     celShader->setMat4("model", model);
-    glm::mat4 invTranspose = glm::inverse(glm::transpose(view * model));
-    celShader->setMat4("invTranspMV", invTranspose);
+    celShader->setMat4("modelInvT", glm::inverse(glm::transpose(model)));
     floorModel->Draw(*celShader);
 }
 
-void drawCar(){
+void drawCar(){edgeShader->use();
+    edgeShader->setBool("doEdgeDetection", config.doEdgeDetection);
     celShader->use();
     // camera parameters
     glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
@@ -507,38 +497,33 @@ void drawCar(){
     // draw wheel
     glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(-.7432, .328, 1.39));
     celShader->setMat4("model", model);
-    glm::mat4 invTranspose = glm::inverse(glm::transpose(view * model));
-    celShader->setMat4("invTranspMV", invTranspose);
+    celShader->setMat4("modelInvT", glm::inverse(glm::transpose(model)));
     carWheel->Draw(*celShader);
 
     // draw wheel
     model = glm::translate(glm::mat4(1.0f), glm::vec3(-.7432, .328, -1.296));
     celShader->setMat4("model", model);
-    invTranspose = glm::inverse(glm::transpose(view * model));
-    celShader->setMat4("invTranspMV", invTranspose);
+    celShader->setMat4("modelInvT", glm::inverse(glm::transpose(model)));
     carWheel->Draw(*celShader);
 
     // draw wheel
     model = glm::rotate(glm::mat4(1.0f), glm::pi<float>(), glm::vec3(0.0, 1.0, 0.0));
     model = glm::translate(model, glm::vec3(-.7432, .328, 1.296));
     celShader->setMat4("model", model);
-    invTranspose = glm::inverse(glm::transpose(view * model));
-    celShader->setMat4("invTranspMV", invTranspose);
+    celShader->setMat4("modelInvT", glm::inverse(glm::transpose(model)));
     carWheel->Draw(*celShader);
 
     // draw wheel
     model = glm::rotate(glm::mat4(1.0f), glm::pi<float>(), glm::vec3(0.0, 1.0, 0.0));
     model = glm::translate(model, glm::vec3(-.7432, .328, -1.39));
     celShader->setMat4("model", model);
-    invTranspose = glm::inverse(glm::transpose(view * model));
-    celShader->setMat4("invTranspMV", invTranspose);
+    celShader->setMat4("modelInvT", glm::inverse(glm::transpose(model)));
     carWheel->Draw(*celShader);
 
     // draw the rest of the car
     model = glm::mat4(1.0f);
     celShader->setMat4("model", model);
-    invTranspose = glm::inverse(glm::transpose(view * model));
-    celShader->setMat4("invTranspMV", invTranspose);
+    celShader->setMat4("modelInvT", glm::inverse(glm::transpose(model)));
     carBody->Draw(*celShader);
     carInterior->Draw(*celShader);
     carPaint->Draw(*celShader);
@@ -550,42 +535,39 @@ void drawCar(){
 }
 
 void drawCrate() {
+    edgeShader->use();
+    edgeShader->setBool("doEdgeDetection", config.doEdgeDetection);
     celShader->use();
     // camera parameters
     glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
     glm::mat4 view = camera.GetViewMatrix();
-    glm::mat4 viewInv = glm::inverse(view);
     glm::mat4 viewProjection = projection * view;
     // set projection matrix uniform
     celShader->setMat4("projection", projection);
     celShader->setMat4("view", view);
-    celShader->setMat4("viewInv", viewInv);
-
 
     glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(3, 1, 1.39));
     celShader->setMat4("model", model);
-    glm::mat4 invTranspose = glm::inverse(glm::transpose(view * model));
-    celShader->setMat4("invTranspMV", invTranspose);
+    celShader->setMat4("modelInvT", glm::inverse(glm::transpose(model)));
     crate->Draw(*celShader);
 }
 
 void drawRobot() {
+    edgeShader->use();
+    edgeShader->setBool("doEdgeDetection", config.doEdgeDetection);
     celShader->use();
     // camera parameters
     glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
     glm::mat4 view = camera.GetViewMatrix();
-    glm::mat4 viewInv = glm::inverse(view);
     glm::mat4 viewProjection = projection * view;
     // set projection matrix uniform
     celShader->setMat4("projection", projection);
     celShader->setMat4("view", view);
-    celShader->setMat4("viewInv", viewInv);
 
 
     glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(-2, 0.28, 1.39));
     celShader->setMat4("model", model);
-    glm::mat4 invTranspose = glm::inverse(glm::transpose(view * model));
-    celShader->setMat4("invTranspMV", invTranspose);
+    celShader->setMat4("modelInvT", glm::inverse(glm::transpose(model)));
     robot->Draw(*celShader);
 }
 
