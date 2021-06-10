@@ -44,7 +44,7 @@ void main() {
     vec3 ambient = ambientLightColor;// * albedo.rgb;
 
     // parallel light
-    vec3 L = normalize(-LightDir_tangent);   // L: - light direction
+    vec3 L = normalize(LightDir_tangent);   // L: - light direction
     float diffuseModulation = max(dot(N, L), 0.0);
     vec3 diffuse = lightColor * diffuseModulation;// * albedo.rgb;
 

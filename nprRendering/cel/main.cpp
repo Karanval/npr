@@ -227,7 +227,7 @@ int main()
         celShader->use();
         drawFloor();
         drawCar();
-        drawCrate();
+        //drawCrate();
         //drawRobot();
         /// second pass, render to texture with edge framebuffer
         glBindFramebuffer(GL_FRAMEBUFFER, edgeFramebuffer);
